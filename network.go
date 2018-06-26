@@ -1156,19 +1156,7 @@ func (n *network) createEndpoint(name string, options ...EndpointOption) (Endpoi
 			ep.releaseAddress()
 		}
 	}()
-	// Moving updateToSTore before calling addEndpoint so that we shall clean up VETH interfaces in case
-	// DockerD get killed between addEndpoint and updateSTore call
-	if err = n.getController().updateToStore(ep); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			if e := n.getController().deleteFromStore(ep); e != nil {
-				logrus.Warnf("error rolling back endpoint %s from store: %v", name, e)
-			}
-		}
-	}()
-
+	
 	if err = n.addEndpoint(ep); err != nil {
 		return nil, err
 	}
@@ -1176,6 +1164,18 @@ func (n *network) createEndpoint(name string, options ...EndpointOption) (Endpoi
 		if err != nil {
 			if e := ep.deleteEndpoint(false); e != nil {
 				logrus.Warnf("cleaning up endpoint failed %s : %v", name, e)
+			}
+		}
+	}()
+	
+	// We should update store after addEndpoint in order to have net iface properly configured
+	if err = n.getController().updateToStore(ep); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			if e := n.getController().deleteFromStore(ep); e != nil {
+				logrus.Warnf("error rolling back endpoint %s from store: %v", name, e)
 			}
 		}
 	}()
